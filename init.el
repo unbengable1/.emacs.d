@@ -1,32 +1,264 @@
-(setq package-archives '(
-                         ("melpa" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
-                         ("gnu" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")))
-(setq package-check-signature nil)
+;;;  -*- lexical-binding: t -*-
+(setq debug-on-error t)
+
 (require 'package)
-(unless (bound-and-true-p package--initialized)
-  (package-initialize))
-(unless package-archive-contents
-  (package-refresh-contents))
 
-(unless (package-installed-p 'use-package)
-  (package-refresh-contents)
-  (package-install 'use-package))
-(eval-and-compile
-  (setq use-package-always-ensure t)
-  (setq use-package-always-defer t)
-  (setq use-package-always-demand nil)
-  (setq use-package-expand-minimally t)
-  (setq use-package-verbose t))
-(use-package quelpa
-             :defer nil
-             :config
-             (use-package quelpa-use-package)
-             (quelpa-use-package-activate-advice))
+(setq package-archives '(("gnu" . "http://mirrors.ustc.edu.cn/elpa/gnu/")
+                         ("melpa" . "http://mirrors.ustc.edu.cn/elpa/melpa/")
+                         ("nongnu" . "http://mirrors.ustc.edu.cn/elpa/nongnu/")))
 
-(add-to-list 'load-path
-             (expand-file-name (concat user-emacs-directory "lisp")))
+(package-initialize)
 
-(setq custom-file "~/.emacs.d/custom.el")
+(let ((normal-gc-cons-threshold (* 20 1024 1024))
+      (init-gc-cons-threshold (* 128 1024 1024)))
+  (setq gc-cons-threshold init-gc-cons-threshold)
+  (add-hook 'emacs-startup-hook
+            (lambda () (setq gc-cons-threshold normal-gc-cons-threshold))))
+
+(progn ; `package'
+  (setq package-selected-packages
+      '(meow
+        company
+        smartparens
+        magit
+	      ivy
+	      counsel
+	      swiper))
+  (unless package-archive-contents
+    (package-refresh-contents))
+  (package-install-selected-packages))
+
+(progn ; `startup'
+  (defvar before-user-init-time (current-time)
+    "Value of `current-time' when Emacs begins loading `user-init-file'.")
+  (message "Loading Emacs...done (%.3fs)"
+           (float-time (time-subtract before-user-init-time
+                                      before-init-time)))
+  (setq user-init-file (or load-file-name buffer-file-name))
+  (setq user-emacs-directory (file-name-directory user-init-file))
+  (message "Loading %s..." user-init-file)
+  (setq inhibit-startup-buffer-menu t)
+  (setq inhibit-startup-screen t)
+  (setq-default cursor-type '(bar . 3))
+    (setq blink-cursor-mode nil)
+  (when (fboundp 'scroll-bar-mode)
+    (scroll-bar-mode 0))
+  (when (fboundp 'tool-bar-mode)
+    (tool-bar-mode 0))
+  (menu-bar-mode 0))
+
+(progn ; `miscs'
+  (setq initial-scratch-message nil)
+  (setq uniquify-buffer-name-style 'post-forward-angle-brackets)
+   ; Show path if names are same
+  (setq adaptive-fill-regexp "[ t]+|[ t]*([0-9]+.|*+)[ t]*")
+  (setq adaptive-fill-first-line-regexp "^* *$")
+  (setq delete-by-moving-to-trash t)
+  ; Deleting files go to OS's trash folder
+  (setq make-backup-files nil)
+  ; Forbide to make backup files
+  (setq auto-save-default nil)
+  ; Disable auto save
+  (setq set-mark-command-repeat-pop t)
+  ; Repeating C-SPC after popping mark pops it again
+  (setq kill-whole-line t) 
+  (setq initial-scratch-message nil)
+  (setq-default major-mode 'text-mode)
+  (setq sentence-end "\\([。！？]\\|……\\|[.?!][]\"')}]*\\($\\|[ \t]\\)\\)[ \t\n]*")
+  (setq sentence-end-double-space nil))
+
+(progn ; `encoding'
+  ;; UTF-8 as the default coding system
+  (when (fboundp 'set-charset-priority)
+    (set-charset-priority 'unicode))
+  ;; Explicitly set the prefered coding systems to avoid annoying prompt
+  ;; from emacs (especially on Microsoft Windows)
+  (prefer-coding-system 'utf-8)
+  (setq locale-coding-system 'utf-8)
+  (set-language-environment 'utf-8)
+  (set-default-coding-systems 'utf-8)
+  (set-buffer-file-coding-system 'utf-8)
+  (set-clipboard-coding-system 'utf-8)
+  (set-file-name-coding-system 'utf-8)
+  (set-keyboard-coding-system 'utf-8)
+  (set-terminal-coding-system 'utf-8)
+  (set-selection-coding-system 'utf-8)
+  (modify-coding-system-alist 'process "*" 'utf-8)
+  (setq system-time-locale "C"))
+
+(progn ; `basic'
+  (global-hl-line-mode 1)
+  (global-display-line-numbers-mode 1)
+  (recentf-mode 1)
+  (setf (cdr (assq 'continuation fringe-indicator-alist))
+      '(nil nil))
+  (define-fringe-bitmap 'left-arrow [])
+  (define-fringe-bitmap 'left-curly-arrow [])
+  (define-fringe-bitmap 'left-triangle [])
+  (global-visual-line-mode 1)
+  (setq word-wrap-by-category t)
+  (ignore-errors (savehist-mode 1))
+  (save-place-mode 1)
+  (show-paren-mode 1)
+  (delete-selection-mode 1)
+  (global-auto-revert-mode 1)
+  (setq electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit)
+  (electric-pair-mode 1)
+  (add-hook 'prog-mode-hook #'subword-mode)
+  (add-hook 'minibuffer-setup-hook #'subword-mode))
+
+(progn ; `company'
+  (require 'company)
+(add-hook 'prog-mode-hook #'company-mode)
+(add-hook 'conf-mode-hook #'company-mode)
+(with-eval-after-load "company"
+  (define-key company-active-map (kbd "{") #'company-select-previous)
+  (define-key company-active-map (kbd "}") #'company-select-next)))
+
+(progn ;`smartparen'
+  (require 'smartparens-config)
+  (require 'smartparens)
+  (add-hook 'prog-mode-hook #'smartparens-mode)
+  (add-hook 'conf-mode-hook #'smartparens-mode)
+  (with-eval-after-load "smartparens"
+  (define-key smartparens-mode-map (kbd "C-)") #'sp-forward-slurp-sexp)
+  (define-key smartparens-mode-map (kbd "C-}") #'sp-forward-barf-sexp)
+  (define-key smartparens-mode-map (kbd "M-r") #'sp-raise-sexp)
+  (define-key smartparens-mode-map (kbd "M-s") #'sp-splice-sexp)))
+
+(progn ;`magit'
+  (autoload #'magit "magit" nil t)
+  (global-set-key (kbd "C-x g") #'magit))
+
+(progn ;`meow'
+  (defun meow-setup ()
+  (setq meow-cheatsheet-layout meow-cheatsheet-layout-dvp)
+  (meow-leader-define-key
+   '("." . meow-find-ref)
+   '("," . meow-pop-marker)
+   '("e" . meow-eval-last-exp)
+   '("o" . delete-other-windows)
+   '("w" . other-window)
+   '("q" . delete-window)
+   '("-" . split-window-below)
+   '("\\" . split-window-right))
+  (meow-normal-define-key
+   '("*" . meow-expand-0)
+   '("=" . meow-expand-9)
+   '("!" . meow-expand-8)
+   '("[" . meow-expand-7)
+   '("]" . meow-expand-6)
+   '("{" . meow-expand-5)
+   '("+" . meow-expand-4)
+   '("}" . meow-expand-3)
+   '(")" . meow-expand-2)
+   '("(" . meow-expand-1)
+   '("1" . digit-argument)
+   '("2" . digit-argument)
+   '("3" . digit-argument)
+   '("4" . digit-argument)
+   '("5" . digit-argument)
+   '("6" . digit-argument)
+   '("7" . digit-argument)
+   '("8" . digit-argument)
+   '("9" . digit-argument)
+   '("0" . digit-argument)
+   '("-" . negative-argument)
+   '(";" . meow-reverse)
+   '("," . meow-inner-of-thing)
+   '("." . meow-bounds-of-thing)
+   '("<" . meow-beginning-of-thing)
+   '(">" . meow-end-of-thing)
+   '("a" . meow-append)
+   '("A" . meow-open-below)
+   '("b" . meow-back-word)
+   '("B" . meow-back-symbol)
+   '("c" . meow-change)
+   '("C" . meow-change-save)
+   '("d" . meow-delete)
+   '("e" . meow-line)
+   '("f" . meow-find)
+   '("F" . meow-find-expand)
+   '("g" . meow-cancel)
+   '("G" . meow-goto-line)
+   '("h" . meow-left)
+   '("H" . meow-left-expand)
+   '("i" . meow-insert)
+   '("I" . meow-open-above)
+   '("j" . meow-join)
+   '("J" . delete-indentation)
+   '("k" . meow-kill)
+   '("l" . meow-till)
+   '("L" . meow-till-expand)
+   '("m" . meow-mark-word)
+   '("M" . meow-mark-symbol)
+   '("n" . meow-next)
+   '("N" . meow-next-expand)
+   '("o" . meow-block)
+   '("O" . meow-block-expand)
+   '("p" . meow-prev)
+   '("P" . meow-prev-expand)
+   '("q" . meow-grab)
+   '("r" . meow-replace)
+   '("R" . meow-replace-save)
+   '("s" . meow-search)
+   '("S" . meow-pop-search)
+   '("t" . meow-right)
+   '("T" . meow-right-expand)
+   '("u" . meow-undo)
+   '("v" . meow-visit)
+   '("w" . meow-next-word)
+   '("W" . meow-next-symbol)
+   '("x" . meow-save)
+   '("y" . meow-yank)
+   '("z" . meow-pop)
+   '("Z" . meow-pop-all-selection)
+   '("&" . meow-query-replace)
+   '("%" . meow-query-replace-regexp)
+   '("<f2>" . meow-quick-kmacro)
+   '("<f3>" . meow-start-kmacro)
+   '("<f4>" . meow-end-or-call-kmacro)
+   '("<escape>" . meow-last-buffer)))
+(require 'meow)
+(meow-setup)
+(meow-global-mode t)
+(meow-setup-indicator)
+(with-eval-after-load "meow"
+  (custom-set-faces
+   '(meow-grab ((t (:inherit secondary-selection))))
+   '(meow-normal-indicator ((t ())))
+   '(meow-motion-indicator ((t ())))
+   '(meow-keypad-indicator ((t ())))
+   '(meow-insert-indicator ((t ()))))
+  (add-to-list 'meow-expand-exclude-mode-list 'dired-mode)
+  (add-to-list 'meow-expand-exclude-mode-list 'wdired-mode)))
+
+(progn ; `ivy'
+  (require 'ivy)
+  (require 'swiper)
+  (require 'counsel)
+  (ivy-mode 1)
+  (setq ivy-use-virtual-buffers t)
+  (setq enable-recursive-minibuffers t)
+  (setq search-default-mode #'char-fold-to-regexp)
+  (global-set-key (kbd "C-s") 'swiper)
+  (global-set-key (kbd "C-c C-r") 'ivy-resume)
+  (global-set-key (kbd "M-x") 'counsel-M-x)
+  (global-set-key (kbd "C-x C-f") 'counsel-find-file)
+  (global-set-key (kbd "C-c f") 'counsel-describe-function)
+  (global-set-key (kbd "C-c v") 'counsel-describe-variable)
+  (global-set-key (kbd "C-c o") 'counsel-describe-symbol)
+  (global-set-key (kbd "C-c l") 'counsel-find-library)
+  (global-set-key (kbd "C-c i") 'counsel-info-lookup-symbol)
+  (global-set-key (kbd "C-c u") 'counsel-unicode-char)
+  (global-set-key (kbd "C-c g") 'counsel-git)
+  (global-set-key (kbd "C-c j") 'counsel-git-grep)
+  (global-set-key (kbd "C-c k") 'counsel-ag)
+  (global-set-key (kbd "C-x l") 'counsel-locate)
+  (global-set-key (kbd "C-S-o") 'counsel-rhythmbox)
+  (define-key minibuffer-local-map (kbd "C-r") 'counsel-minibuffer-history))
+
+(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
 (unless (file-exists-p custom-file)
   (write-region "" nil custom-file))
 (load custom-file)
